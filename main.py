@@ -5,7 +5,7 @@ import pyqtgraph as pg
 import sys
 import AudioAnalyzer as AA
 import RealTimePlayer as rtp
-import threading
+import jsonServer
 import time
 
 
@@ -27,9 +27,11 @@ class MainWindow(QMainWindow):
         audio_input_selection_label.setText('Select input device')
         source_selection_layout_widget_list.append(audio_input_selection_label)
 
+        default_index = AA.get_def_index()
         self.audio_input_selection = QComboBox()
         self.audio_input_selection.addItems(AA.get_audio_input_list())
         source_selection_layout_widget_list.append(self.audio_input_selection)
+        self.audio_input_selection.setCurrentIndex(default_index)
 
         audio_output_selection_label = QLabel()
         audio_output_selection_label.setText('Select output device')
@@ -115,11 +117,11 @@ class MainWindow(QMainWindow):
         self.graphWidget.plot(self.player.data, pen='b')
 
     def update_data_label(self):
-        rms = AA.calculate_rms(self.player.data)
-        db = AA.calculate_db(rms)
-        freq = AA.calculate_audio_freq(self.player)
-        audio_status = False if rms < 0.003 else True
-        self.data_label.setText(self.label_text.format(rms, db, audio_status, freq))
+        AA.rms = AA.calculate_rms(self.player.data)
+        AA.db = AA.calculate_db(AA.rms)
+        AA.freq = AA.calculate_audio_freq(self.player)
+        AA.audio_status = False if AA.rms < 0.003 else True
+        self.data_label.setText(self.label_text.format(AA.rms, AA.db, AA.audio_status, AA.freq))
 
 
 

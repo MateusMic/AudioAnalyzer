@@ -1,11 +1,13 @@
 import sounddevice as sd
 import audioop
-import RealTimePlayer as rtp
 from math import log10
-from scipy.fft import fft
-import scipy
 import numpy as np
 
+
+rms = None
+db = None
+freq = None
+audio_status = False
 
 def get_audio_input_list():
     audio_devices_list = []
@@ -58,7 +60,19 @@ def calculate_audio_freq(player):
         thefreq = which*player.RATE/player.CHUNK
         return int(thefreq)
 
+
+def get_def_index():
+    return 1
 # print(sd.query_devices())
 # print(get_audio_output_list())
+
+
+def get_audio_state():
+    global audio_status
+    if audio_status:
+        j = {"id": 1, "jsonrpc": "2.0", "result": "audio"}
+    else:
+        j = {"id": 1, "jsonrpc": "2.0", "result": "mute"}
+    return j
 
 

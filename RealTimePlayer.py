@@ -1,7 +1,6 @@
 import pyaudio
 import numpy as np
 import threading
-import audioop
 
 
 class RealTimePlayer(threading.Thread):
@@ -11,7 +10,7 @@ class RealTimePlayer(threading.Thread):
         self.output_device_id = output_device_id
         self.name = 'RealTimePlayer'
         self.state = False
-        self.player_state = False
+        self.player_state = True
         # self.CHUNK = 1024
         self.CHUNK = 1024
         self.RATE = 44100
@@ -51,9 +50,7 @@ class RealTimePlayer(threading.Thread):
         self.player = self.p.open(format=pyaudio.paInt16, channels=1, rate=self.RATE, output=True,
                                   output_device_index=self.output_device_id, frames_per_buffer=self.CHUNK)
 
-# player = RealTimePlayer(4, 7)
-# player.state = 1
-# player.start()
+
 
 
 
