@@ -43,12 +43,13 @@ def calculate_rms(data):
 
 
 def calculate_db(rms):
-    db = 20 * log10(rms)
+    db = 0
+    # db = 20 * log10(rms)
     return int(db)
 
 
 def calculate_audio_freq(player):
-    fftData = np.abs(np.fft.rfft(player.raw_data))
+    fftData = np.abs(np.fft.rfft(player.data))
     which = fftData[1:].argmax() + 1
     if which != len(fftData)-1:
         y0, y1, y2 = np.log(fftData[which-1:which+2:])
@@ -73,6 +74,12 @@ def get_audio_state():
         j = {"id": 1, "jsonrpc": "2.0", "result": "audio"}
     else:
         j = {"id": 1, "jsonrpc": "2.0", "result": "mute"}
+    return j
+
+
+def get_audio_level():
+    global rms
+    j = {"id": 1, "jsonrpc": "2.0", "result": f"{rms}"}
     return j
 
 

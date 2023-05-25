@@ -5,7 +5,6 @@ import pyqtgraph as pg
 import sys
 import AudioAnalyzer as AA
 import RealTimePlayer as rtp
-import jsonServer
 import time
 
 
@@ -13,15 +12,29 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.player = rtp.RealTimePlayer()
-
         self.setWindowTitle("Audio analyzer")
 
         main_layout = QVBoxLayout()
+
+        layout_list = []
+
         source_selection_layout = QHBoxLayout()
-        main_layout.addLayout(source_selection_layout)
+        listening_layout = QHBoxLayout()
+        recording_layout = QHBoxLayout()
+        output_layout = QHBoxLayout()
+
+        layout_list.append(source_selection_layout)
+        layout_list.append(listening_layout)
+        layout_list.append(output_layout)
+        layout_list.append(recording_layout)
+
+        for layout in layout_list:
+            main_layout.addLayout(layout)
 
         source_selection_layout_widget_list = []
+        listening_layout_widget_list = []
+        recording_layout_widget_list = []
+        output_layout_widget_list = []
 
         audio_input_selection_label = QLabel()
         audio_input_selection_label.setText('Select input device')
@@ -41,11 +54,32 @@ class MainWindow(QMainWindow):
         self.audio_output_selection.addItems(AA.get_audio_output_list())
         source_selection_layout_widget_list.append(self.audio_output_selection)
 
-        self.play_button = QPushButton()
-        self.play_button.setIcon(QIcon(r'C:\Users\mjl2yj\PycharmProjects\AudioRecognizer\icons\playButton.jpg'))
-        self.play_button.setText('Play')
-        self.play_button.clicked.connect(self.play_button_state_change)
-        source_selection_layout_widget_list.append(self.play_button)
+        self.output_status_label = QLabel()
+        self.output_status_label.setText('Output status')
+        output_layout_widget_list.append(self.output_status_label)
+
+        self.output_status_button = QPushButton()
+        self.output_status_button.setText('Turn ON')
+        self.output_status_button.clicked.connect(self.output_state_change)
+        output_layout_widget_list.append(self.output_status_button)
+
+        self.listening_label = QLabel()
+        self.listening_label.setText('Listening')
+        listening_layout_widget_list.append(self.listening_label)
+
+        self.start_listening_button = QPushButton()
+        self.start_listening_button.setText('Start')
+        self.start_listening_button.clicked.connect(self.listening_state_change)
+        listening_layout_widget_list.append(self.start_listening_button)
+
+        self.recording_label = QLabel()
+        self.recording_label.setText('Recording')
+        recording_layout_widget_list.append(self.recording_label)
+
+        self.start_recording_button = QPushButton()
+        self.start_recording_button.setText('Start')
+        self.start_recording_button.clicked.connect(self.recording_state_change)
+        recording_layout_widget_list.append(self.start_recording_button)
 
         self.graphWidget = pg.PlotWidget()
         self.graphWidget.hideAxis('left')
@@ -60,9 +94,17 @@ class MainWindow(QMainWindow):
         self.timer2 = QTimer()
         self.timer2.timeout.connect(self.update_data_label)
 
-
         for w in source_selection_layout_widget_list:
             source_selection_layout.addWidget(w)
+
+        for w in listening_layout_widget_list:
+            listening_layout.addWidget(w)
+
+        for w in output_layout_widget_list:
+            output_layout.addWidget(w)
+
+        for w in recording_layout_widget_list:
+            recording_layout.addWidget(w)
 
         main_layout.addWidget(self.graphWidget)
         main_layout.addWidget(self.data_label)
@@ -84,7 +126,9 @@ class MainWindow(QMainWindow):
         output_index = int(output[:output.find('-')])
         return output_index
 
-    def play(self):
+    def start_listening(self):
+        print('Start listening')
+        self.player = rtp.RealTimePlayer()
         self.player.input_device_id = self.get_selected_input()
         self.player.output_device_id = self.get_selected_output()
         self.player.state = True
@@ -94,23 +138,65 @@ class MainWindow(QMainWindow):
         self.timer.start(100)
         # update data label widget
         self.timer2.start(100)
-        self.play_button.setText('Pause')
-        self.play_button.setIcon(QIcon(r'C:\Users\mjl2yj\PycharmProjects\AudioRecognizer\icons\pauseButton.jpg'))
+        self.start_listening_button.setText('Stop')
 
-    def stop(self):
+    def start_recording(self):
+        print('Start recording')
+        self.player.start_recording()
+        self.start_recording_button.setText('Stop')
+
+    def start_output(self):
+        print('Start output streaming')
+        self.player.output_state = True
+        self.output_status_button.setText('Turn OFF')
+
+    def stop_listening(self):
+        print('Stop listening')
         self.player.state = False
         # Stop update graph widget
         self.timer.stop()
         # Stop update data label widget
         self.timer2.stop()
-        self.play_button.setText('Play')
-        self.play_button.setIcon(QIcon(r'C:\Users\mjl2yj\PycharmProjects\AudioRecognizer\icons\playButton.jpg'))
+        self.start_listening_button.setText('Start')
 
-    def play_button_state_change(self):
-        if self.player.state == 1:
-            self.stop()
+    def stop_recording(self):
+        print('Stop recording')
+        self.player.stop_recording()
+        self.start_recording_button.setText('Start')
+
+    def stop_output(self):
+        print('Stop output streaming')
+        self.player.output_state = False
+        self.output_status_button.setText('Turn ON')
+
+    def listening_state_change(self):
+        if 'player' not in vars(self):
+            self.start_listening()
         else:
-            self.play()
+            if self.player.state:
+                self.stop_listening()
+            else:
+                self.start_listening()
+
+    def recording_state_change(self):
+        if 'player' not in vars(self):
+            print('Cannot start recording. Object not created yet')
+            return -1
+        else:
+            if self.player.recording_state:
+                self.stop_recording()
+            else:
+                self.start_recording()
+
+    def output_state_change(self):
+        if 'player' not in vars(self):
+            print('Cannot start output stream. Player object not created yet')
+            return -1
+        else:
+            if self.player.output_state:
+                self.stop_output()
+            else:
+                self.start_output()
 
     def update_graph_widget(self):
         self.graphWidget.plotItem.clear()

@@ -15,7 +15,7 @@ class jsonServer(threading.Thread):
         self.sock.listen(5)
         print('socket is listening')
         self.response = None
-        self.method = {'getAudioState0': AA.get_audio_state}
+        self.method = {'getAudioState0': AA.get_audio_state, 'getAudioLevel0': AA.get_audio_level}
 
     def run(self):
         while True:
