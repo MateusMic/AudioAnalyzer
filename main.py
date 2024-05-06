@@ -6,6 +6,8 @@ import sys
 import AudioAnalyzer as AA
 import RealTimePlayer as rtp
 import time
+import jsonServer
+import threading
 
 
 class MainWindow(QMainWindow):
@@ -22,11 +24,15 @@ class MainWindow(QMainWindow):
         listening_layout = QHBoxLayout()
         recording_layout = QHBoxLayout()
         output_layout = QHBoxLayout()
+        mute_level_layout = QHBoxLayout()
+        recognize_audio_layout = QHBoxLayout()
 
         layout_list.append(source_selection_layout)
         layout_list.append(listening_layout)
         layout_list.append(output_layout)
         layout_list.append(recording_layout)
+        layout_list.append(recognize_audio_layout)
+        layout_list.append(mute_level_layout)
 
         for layout in layout_list:
             main_layout.addLayout(layout)
@@ -35,12 +41,14 @@ class MainWindow(QMainWindow):
         listening_layout_widget_list = []
         recording_layout_widget_list = []
         output_layout_widget_list = []
+        config_layout_widget_list = []
+        recognize_audio_layout_widget_list = []
 
         audio_input_selection_label = QLabel()
         audio_input_selection_label.setText('Select input device')
         source_selection_layout_widget_list.append(audio_input_selection_label)
 
-        default_index = AA.get_def_index()
+        default_index = 4
         self.audio_input_selection = QComboBox()
         self.audio_input_selection.addItems(AA.get_audio_input_list())
         source_selection_layout_widget_list.append(self.audio_input_selection)
@@ -81,6 +89,23 @@ class MainWindow(QMainWindow):
         self.start_recording_button.clicked.connect(self.recording_state_change)
         recording_layout_widget_list.append(self.start_recording_button)
 
+        self.recognize_label = QLabel()
+        self.recognize_label.setText('Set Compare File')
+        recognize_audio_layout_widget_list.append(self.recognize_label)
+
+        self.compare_file_path = QLineEdit()
+        self.compare_file_path.setText(r'C:\tmp\file.wav')
+        recognize_audio_layout_widget_list.append(self.compare_file_path)
+
+        self.similarity_label = QLabel()
+        self.similarity_label.setText('Similarity=-11')
+        recognize_audio_layout_widget_list.append(self.similarity_label)
+
+        self.start_recognize_button = QPushButton()
+        self.start_recognize_button.setText('Compare')
+        self.start_recognize_button.clicked.connect(self.start_compering_audio)
+        recognize_audio_layout_widget_list.append(self.start_recognize_button)
+
         self.graphWidget = pg.PlotWidget()
         self.graphWidget.hideAxis('left')
         self.graphWidget.hideAxis('bottom')
@@ -94,6 +119,20 @@ class MainWindow(QMainWindow):
         self.timer2 = QTimer()
         self.timer2.timeout.connect(self.update_data_label)
 
+        self.mute_level_label = QLabel()
+        self.mute_level_label.setText('Set Mute level')
+        config_layout_widget_list.append(self.mute_level_label)
+        self.mute_level = QLineEdit()
+        self.mute_level.setText('0.00005')
+        config_layout_widget_list.append(self.mute_level)
+        self.rec_path_label = QLabel()
+        self.rec_path_label.setText('Set path for recording')
+        config_layout_widget_list.append(self.rec_path_label)
+        self.rec_path = QLineEdit()
+        self.rec_path.setText(r'C:\tmp\file.wav')
+        config_layout_widget_list.append(self.rec_path)
+
+
         for w in source_selection_layout_widget_list:
             source_selection_layout.addWidget(w)
 
@@ -105,6 +144,12 @@ class MainWindow(QMainWindow):
 
         for w in recording_layout_widget_list:
             recording_layout.addWidget(w)
+
+        for w in config_layout_widget_list:
+            mute_level_layout.addWidget(w)
+
+        for w in recognize_audio_layout_widget_list:
+            recognize_audio_layout.addWidget(w)
 
         main_layout.addWidget(self.graphWidget)
         main_layout.addWidget(self.data_label)
@@ -128,9 +173,8 @@ class MainWindow(QMainWindow):
 
     def start_listening(self):
         print('Start listening')
-        self.player = rtp.RealTimePlayer()
-        self.player.input_device_id = self.get_selected_input()
-        self.player.output_device_id = self.get_selected_output()
+        self.player = rtp.RealTimePlayer(input_device_id=self.get_selected_input(),
+                                         output_device_id=self.get_selected_output())
         self.player.state = True
         self.player.start()
         time.sleep(0.5)
@@ -162,6 +206,7 @@ class MainWindow(QMainWindow):
     def stop_recording(self):
         print('Stop recording')
         self.player.stop_recording()
+        self.player.save_recording_to_file(self.rec_path.text())
         self.start_recording_button.setText('Start')
 
     def stop_output(self):
@@ -203,13 +248,31 @@ class MainWindow(QMainWindow):
         self.graphWidget.plot(self.player.data, pen='b')
 
     def update_data_label(self):
-        AA.rms = AA.calculate_rms(self.player.data)
-        AA.db = AA.calculate_db(AA.rms)
+        rtp_rms = self.player.calc_rms()
+        db = self.player.calc_db()
         AA.freq = AA.calculate_audio_freq(self.player)
-        AA.audio_status = False if AA.rms < 0.003 else True
-        self.data_label.setText(self.label_text.format(AA.rms, AA.db, AA.audio_status, AA.freq))
+        AA.audio_status = False if float(rtp_rms) < float(self.mute_level.text()) else True
+        self.data_label.setText(self.label_text.format(rtp_rms, db, AA.audio_status, AA.freq))
 
+    def start_compering_audio(self):
+        # self.player.recognize_state = True
+        file_path1 = self.compare_file_path.text()
+        thread = threading.Thread(target=self.compare_audio, args=(file_path1,))
+        thread.start()
 
+    def record_sample(self, t):
+        self.player.start_recording()
+        time.sleep(t)
+        self.player.stop_recording()
+
+    def compare_audio(self, file_path1,):
+        self.record_sample(10)
+        self.player.recording
+        similarity = AA.recognize_audio(file_path1, self.player.recording)
+        self.player.recording = []
+        print(similarity)
+        sim = similarity * 100
+        self.similarity_label.setText(f'Similarity={sim:.1f}%')
 
 
 

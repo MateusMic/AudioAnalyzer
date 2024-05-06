@@ -10,7 +10,7 @@ class jsonServer(threading.Thread):
         threading.Thread.__init__(self)
         self.sock = socket.socket()
         print("Socket created ...")
-        self.port = 1500
+        self.port = 1698
         self.sock.bind(('', self.port))
         self.sock.listen(5)
         print('socket is listening')
@@ -36,7 +36,7 @@ class jsonServer(threading.Thread):
 
 t = jsonServer()
 t.start()
-
+print("JSON SERVER STARTED")
 
 
 

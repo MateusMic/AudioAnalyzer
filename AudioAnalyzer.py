@@ -1,51 +1,38 @@
-import sounddevice as sd
-import audioop
-from math import log10
 import numpy as np
-
+import pyaudio
+import soundfile as sf
+from scipy.spatial.distance import cosine
 
 rms = None
 db = None
 freq = None
 audio_status = False
+similarity = -10
 
 def get_audio_input_list():
     audio_devices_list = []
-    d = list(sd.query_devices())
-    print(d)
-    for i in d:
-        if 'mic' in str(i).lower() and not 'microsoft' in str(i).lower():
-            index = i['index']
-            index = index if len(str(index)) > 1 else f'0{index}'
-            name = i['name']
-            audio_devices_list.append(f'{index}-{name}')
-    audio_devices_list.sort()
+    p = pyaudio.PyAudio()
+    devices = p.get_device_count()
+    for i in range(devices):
+        # Get the device info
+        device_info = p.get_device_info_by_index(i)
+        # Check if this device is a microphone (an input device)
+        if device_info.get('maxInputChannels') > 0:
+            audio_devices_list.append(f'{device_info.get("index")}-{device_info.get("name")}')
     return audio_devices_list
 
 
 def get_audio_output_list():
     audio_devices_list = []
-    d = list(sd.query_devices())
-    print(d)
-    for i in d:
-        if 'mic' not in str(i).lower() and 'microsoft' not in str(i).lower():
-            index = i['index']
-            index = index if len(str(index)) > 1 else f'0{index}'
-            name = i['name']
-            audio_devices_list.append(f'{index}-{name}')
-    audio_devices_list.sort()
+    p = pyaudio.PyAudio()
+    devices = p.get_device_count()
+    for i in range(devices):
+        # Get the device info
+        device_info = p.get_device_info_by_index(i)
+        # Check if this device is a microphone (an input device)
+        if device_info.get('maxInputChannels') == 0:
+            audio_devices_list.append(f'{device_info.get("index")}-{device_info.get("name")}')
     return audio_devices_list
-
-
-def calculate_rms(data):
-    rms = audioop.rms(data[-1024:], 2) / 32767
-    return rms
-
-
-def calculate_db(rms):
-    db = 0
-    # db = 20 * log10(rms)
-    return int(db)
 
 
 def calculate_audio_freq(player):
@@ -60,12 +47,6 @@ def calculate_audio_freq(player):
     else:
         thefreq = which*player.RATE/player.CHUNK
         return int(thefreq)
-
-
-def get_def_index():
-    return 1
-# print(sd.query_devices())
-# print(get_audio_output_list())
 
 
 def get_audio_state():
@@ -83,3 +64,16 @@ def get_audio_level():
     return j
 
 
+def recognize_audio(file1, recording_data):
+    y1, sr1 = load_audio_file(file1)
+    # y2, sr2 = load_audio_file(file2)
+    y2 = np.frombuffer(b''.join(recording_data), dtype=np.float32)
+    similarity = 1 - cosine(y1[:len(y2)], y2)
+    return similarity
+
+
+def load_audio_file(file_path):
+    y, sr = sf.read(file_path)
+    if len(y.shape) > 1:  # Sprawdzenie czy dane audio są wielokanałowe
+        y = np.mean(y, axis=1)  # Konwersja na jednokanałowe, jeśli są wielokanałowe
+    return y, sr
