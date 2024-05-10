@@ -3,16 +3,18 @@ from PyQt6.QtGui import *
 from PyQt6.QtCore import *
 import pyqtgraph as pg
 import sys
-import AudioAnalyzer as AA
 import RealTimePlayer as rtp
 import time
-import jsonServer
+import pyaudio
 import threading
+from jsonServer import jsonServer
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        self.player = None
 
         self.setWindowTitle("Audio analyzer")
 
@@ -48,19 +50,22 @@ class MainWindow(QMainWindow):
         audio_input_selection_label.setText('Select input device')
         source_selection_layout_widget_list.append(audio_input_selection_label)
 
-        default_index = 4
+        default_input_index = 2
         self.audio_input_selection = QComboBox()
-        self.audio_input_selection.addItems(AA.get_audio_input_list())
+        self.audio_input_selection.addItems(self.get_audio_input_list())
         source_selection_layout_widget_list.append(self.audio_input_selection)
-        self.audio_input_selection.setCurrentIndex(default_index)
+        self.audio_input_selection.setCurrentIndex(default_input_index)
+
 
         audio_output_selection_label = QLabel()
         audio_output_selection_label.setText('Select output device')
         source_selection_layout_widget_list.append(audio_output_selection_label)
 
+        default_output_index = 1
         self.audio_output_selection = QComboBox()
-        self.audio_output_selection.addItems(AA.get_audio_output_list())
+        self.audio_output_selection.addItems(self.get_audio_output_list())
         source_selection_layout_widget_list.append(self.audio_output_selection)
+        self.audio_output_selection.setCurrentIndex(default_output_index)
 
         self.output_status_label = QLabel()
         self.output_status_label.setText('Output status')
@@ -129,7 +134,7 @@ class MainWindow(QMainWindow):
         self.rec_path_label.setText('Set path for recording')
         config_layout_widget_list.append(self.rec_path_label)
         self.rec_path = QLineEdit()
-        self.rec_path.setText(r'C:\tmp\file.wav')
+        self.rec_path.textChanged.connect(self.set_recording_path)
         config_layout_widget_list.append(self.rec_path)
 
 
@@ -176,6 +181,7 @@ class MainWindow(QMainWindow):
         self.player = rtp.RealTimePlayer(input_device_id=self.get_selected_input(),
                                          output_device_id=self.get_selected_output())
         self.player.state = True
+        self.player.rec_path = self.rec_path.text() if self.rec_path.text() != '' else self.player.rec_path
         self.player.start()
         time.sleep(0.5)
         # update graph widget
@@ -208,6 +214,7 @@ class MainWindow(QMainWindow):
         self.player.stop_recording()
         self.player.save_recording_to_file(self.rec_path.text())
         self.start_recording_button.setText('Start')
+        self.player.recording = []
 
     def stop_output(self):
         print('Stop output streaming')
@@ -215,7 +222,7 @@ class MainWindow(QMainWindow):
         self.output_status_button.setText('Turn ON')
 
     def listening_state_change(self):
-        if 'player' not in vars(self):
+        if self.player is None:
             self.start_listening()
         else:
             if self.player.state:
@@ -250,9 +257,9 @@ class MainWindow(QMainWindow):
     def update_data_label(self):
         rtp_rms = self.player.calc_rms()
         db = self.player.calc_db()
-        AA.freq = AA.calculate_audio_freq(self.player)
-        AA.audio_status = False if float(rtp_rms) < float(self.mute_level.text()) else True
-        self.data_label.setText(self.label_text.format(rtp_rms, db, AA.audio_status, AA.freq))
+        freq = self.player.calculate_audio_freq()
+        audio_status = self.player.check_audio_is_available(self.mute_level.text())
+        self.data_label.setText(self.label_text.format(rtp_rms, db, audio_status, freq))
 
     def start_compering_audio(self):
         # self.player.recognize_state = True
@@ -267,12 +274,38 @@ class MainWindow(QMainWindow):
 
     def compare_audio(self, file_path1,):
         self.record_sample(10)
-        self.player.recording
-        similarity = AA.recognize_audio(file_path1, self.player.recording)
+        similarity = self.player.recognize_audio(file_path1, self.player.recording)
         self.player.recording = []
-        print(similarity)
         sim = similarity * 100
         self.similarity_label.setText(f'Similarity={sim:.1f}%')
+
+    def set_recording_path(self, path):
+        if self.player:
+            self.player.rec_path = self.rec_path.text()
+
+    def get_audio_input_list(self):
+        audio_devices_list = []
+        p = pyaudio.PyAudio()
+        devices = p.get_device_count()
+        for i in range(devices):
+            # Get the device info
+            device_info = p.get_device_info_by_index(i)
+            # Check if this device is a microphone (an input device)
+            if device_info.get('maxInputChannels') > 0:
+                audio_devices_list.append(f'{device_info.get("index")}-{device_info.get("name")}')
+        return audio_devices_list
+
+    def get_audio_output_list(self):
+        audio_devices_list = []
+        p = pyaudio.PyAudio()
+        devices = p.get_device_count()
+        for i in range(devices):
+            # Get the device info
+            device_info = p.get_device_info_by_index(i)
+            # Check if this device is a microphone (an input device)
+            if device_info.get('maxInputChannels') == 0:
+                audio_devices_list.append(f'{device_info.get("index")}-{device_info.get("name")}')
+        return audio_devices_list
 
 
 
@@ -282,6 +315,8 @@ class MainWindow(QMainWindow):
 
 app = QApplication(sys.argv)
 window = MainWindow()
+jsonServer = jsonServer(window)
+jsonServer.start()
 window.show()
 
 app.exec()
