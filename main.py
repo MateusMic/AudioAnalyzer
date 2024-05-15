@@ -8,6 +8,8 @@ import time
 import pyaudio
 import threading
 from jsonServer import jsonServer
+from numpy import mean
+import os
 
 
 class MainWindow(QMainWindow):
@@ -99,7 +101,7 @@ class MainWindow(QMainWindow):
         recognize_audio_layout_widget_list.append(self.recognize_label)
 
         self.compare_file_path = QLineEdit()
-        self.compare_file_path.setText(r'C:\tmp\file.wav')
+        self.compare_file_path.setText(rf'{os.getcwd()}\file.wav')
         recognize_audio_layout_widget_list.append(self.compare_file_path)
 
         self.similarity_label = QLabel()
@@ -134,6 +136,7 @@ class MainWindow(QMainWindow):
         self.rec_path_label.setText('Set path for recording')
         config_layout_widget_list.append(self.rec_path_label)
         self.rec_path = QLineEdit()
+        self.rec_path.setText(rf'{os.getcwd()}\file.wav')
         self.rec_path.textChanged.connect(self.set_recording_path)
         config_layout_widget_list.append(self.rec_path)
 
@@ -261,23 +264,28 @@ class MainWindow(QMainWindow):
         audio_status = self.player.check_audio_is_available(self.mute_level.text())
         self.data_label.setText(self.label_text.format(rtp_rms, db, audio_status, freq))
 
-    def start_compering_audio(self):
+    def start_compering_audio(self, t: int = 10):
         # self.player.recognize_state = True
         file_path1 = self.compare_file_path.text()
-        thread = threading.Thread(target=self.compare_audio, args=(file_path1,))
+        thread = threading.Thread(target=self.compare_audio, args=(file_path1, t,))
         thread.start()
+        thread.join()
+        return self.player.similarity
+
 
     def record_sample(self, t):
         self.player.start_recording()
         time.sleep(t)
         self.player.stop_recording()
 
-    def compare_audio(self, file_path1,):
-        self.record_sample(10)
+    def compare_audio(self, file_path1, t: int = 10):
+        print('Compering...')
+        self.record_sample(t)
         similarity = self.player.recognize_audio(file_path1, self.player.recording)
         self.player.recording = []
-        sim = similarity * 100
+        sim = mean(list(similarity.values()))
         self.similarity_label.setText(f'Similarity={sim:.1f}%')
+        return similarity
 
     def set_recording_path(self, path):
         if self.player:

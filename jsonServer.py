@@ -18,17 +18,19 @@ class jsonServer(threading.Thread):
                        'getAudioLevel0': self.get_audio_level,
                        'setRecordingPath': self.set_recording_path,
                        'startRecording': self.start_recording,
-                       'stopRecording': self.stop_recording}
+                       'stopRecording': self.stop_recording,
+                       'setFileToCompare': self.set_file_to_compare,
+                       'compareAudio': self.compare_audio}
 
     def run(self):
         while True:
             c, addr = self.sock.accept()
             # print('got connection from ', addr)
             json_received = c.recv(1024)
-            # print("Json received -->", json_received)
+            print("Json received -->", json_received)
             self.response = json.dumps(self.set_response(json.loads(json_received)))
             c.sendall(self.response.encode())
-            # print("Json response -->", self.response)
+            print("Json response -->", self.response)
             c.close()
 
     def set_response(self, json_received: dict):
@@ -81,3 +83,23 @@ class jsonServer(threading.Thread):
         else:
             j = {"id": 1, "jsonrpc": "2.0", "result": f"false"}
             return j
+
+    def set_file_to_compare(self, json_msg):
+        path = json_msg.get('params')
+        self.window.compare_file_path.setText(path)
+        if self.window.compare_file_path.text() == path:
+            j = {"id": 1, "jsonrpc": "2.0", "result": f"true"}
+        else:
+            j = {"id": 1, "jsonrpc": "2.0", "result": f"false"}
+        return j
+
+    def compare_audio(self, json_msg):
+        if self.window.player is None or self.window.player.recording_state:
+            j = {"id": 1, "jsonrpc": "2.0", "result": f"false"}
+            return j
+        t = json_msg.get('params')
+        print(f'Czas= {t}')
+        res = self.window.start_compering_audio(t)
+        print(res)
+        j = {"id": 1, "jsonrpc": "2.0", "result": res}
+        return j
